@@ -1,0 +1,1321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Walkthrough</title>
+    <link rel="icon" type="image/png" href="/static/icons/favicon.png">
+    <link rel="stylesheet" href="/static/css/inter.css">
+    <link rel="stylesheet" href="/static/css/github-dark.min.css">
+
+    <!-- Catppuccin Mocha Theme -->
+    <style>
+        :root {
+            --rosewater: #f5e0dc; --flamingo: #f2cdcd; --pink: #f5c2e7;
+            --mauve: #cba6f7; --red: #f38ba8; --maroon: #eba0ac;
+            --peach: #fab387; --yellow: #f9e2af; --green: #a6e3a1;
+            --teal: #94e2d5; --sky: #89dceb; --sapphire: #74c7ec;
+            --blue: #89b4fa; --lavender: #b4befe; --text: #cdd6f4;
+            --subtext1: #bac2de; --subtext0: #a6adc8; --overlay2: #9399b2;
+            --overlay1: #7f849c; --overlay0: #6c7086; --surface2: #585b70;
+            --surface1: #45475a; --surface0: #313244; --base: #1e1e2e;
+            --mantle: #181825; --crust: #11111b;
+        }
+        body { font-family: 'Inter', sans-serif; margin: 0; overflow: hidden; }
+
+        /* Clean node styling */
+        .canvas-node {
+            position: absolute;
+            background: var(--base);
+            border: 1px solid var(--surface1);
+            border-radius: 8px;
+            overflow: visible;
+            user-select: none;
+            display: flex;
+            flex-direction: column;
+            cursor: grab;
+        }
+        .canvas-node:hover { border-color: var(--surface2); }
+        .canvas-node.selected { border-color: var(--blue); box-shadow: 0 0 0 1px var(--blue); }
+        .canvas-node.dragging { cursor: grabbing; }
+
+        .canvas-group {
+            background: color-mix(in srgb, var(--blue) 3%, var(--crust));
+            border-style: dashed;
+            border-color: var(--surface1);
+        }
+
+        /* Markdown content */
+        .node-content h1, .node-content h2, .node-content h3,
+        .node-content h4, .node-content h5, .node-content h6 {
+            color: var(--text); margin: 0.4em 0 0.2em 0; line-height: 1.3;
+        }
+        .node-content h1 { font-size: 1.75em; font-weight: 700; }
+        .node-content h2 { font-size: 1.35em; font-weight: 600; }
+        .node-content h3 { font-size: 1.15em; font-weight: 600; }
+        .node-content h4 { font-size: 1.0em; font-weight: 600; }
+        .node-content h1:first-child, .node-content h2:first-child, .node-content h3:first-child {
+            margin-top: 0;
+        }
+        .node-content p { margin: 0.35em 0; line-height: 1.5; }
+        .node-content ul, .node-content ol { margin: 0.25em 0; padding-left: 1.4em; }
+        .node-content li { margin: 0.1em 0; }
+        .node-content a { color: var(--blue); text-decoration: underline; }
+        .node-content code {
+            background: var(--mantle); padding: 0.1em 0.3em; border-radius: 3px;
+            font-size: 0.85em; font-family: 'JetBrains Mono', monospace;
+        }
+        .node-content pre {
+            background: var(--mantle) !important; border-radius: 6px;
+            padding: 0.5em; overflow-x: auto; margin: 0.4em 0;
+        }
+        .node-content pre code {
+            background: none; padding: 0; font-size: 0.8em;
+        }
+        .node-content blockquote {
+            border-left: 2px solid var(--surface2); margin: 0.35em 0;
+            padding: 0.15em 0.5em; color: var(--subtext0);
+        }
+        .node-content strong { color: var(--text); font-weight: 600; }
+        .node-content em { color: var(--subtext1); }
+        .node-content img { max-width: 100%; border-radius: 4px; }
+        .node-content table { border-collapse: collapse; width: 100%; margin: 0.4em 0; }
+        .node-content th, .node-content td {
+            border: 1px solid var(--surface1); padding: 0.25em 0.5em; text-align: left;
+        }
+        .node-content th { background: var(--surface0); font-weight: 600; }
+
+        /* Highlight.js Catppuccin overrides */
+        .hljs { background: var(--mantle) !important; color: var(--text) !important; }
+
+        /* Resize handles */
+        .resize-handle { position: absolute; z-index: 10; opacity: 0; transition: opacity 0.15s; }
+        .canvas-node:hover .resize-handle, .canvas-node.selected .resize-handle { opacity: 1; }
+        .resize-n  { top: -3px; left: 10px; right: 10px; height: 6px; cursor: ns-resize; }
+        .resize-s  { bottom: -3px; left: 10px; right: 10px; height: 6px; cursor: ns-resize; }
+        .resize-e  { right: -3px; top: 10px; bottom: 10px; width: 6px; cursor: ew-resize; }
+        .resize-w  { left: -3px; top: 10px; bottom: 10px; width: 6px; cursor: ew-resize; }
+        .resize-nw { top: -4px; left: -4px; width: 8px; height: 8px; cursor: nwse-resize; }
+        .resize-ne { top: -4px; right: -4px; width: 8px; height: 8px; cursor: nesw-resize; }
+        .resize-se { bottom: -4px; right: -4px; width: 8px; height: 8px; cursor: nwse-resize; }
+        .resize-sw { bottom: -4px; left: -4px; width: 8px; height: 8px; cursor: nesw-resize; }
+
+        /* Laser pointer trail — stroke only, no fill */
+        #laser-svg {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 9999; display: none;
+        }
+
+        /* Node content clip — needed because .canvas-node is overflow:visible for anchor dots */
+        .node-content {
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        /* Edge anchor dots */
+        .anchor-dot {
+            position: absolute; width: 16px; height: 16px; border-radius: 50%;
+            background: var(--blue); border: 2px solid var(--base);
+            opacity: 0; transition: opacity 0.15s; cursor: crosshair; z-index: 15;
+        }
+        .canvas-node:hover .anchor-dot { opacity: 1; }
+        .anchor-dot.snap-highlight {
+            opacity: 1;
+            width: 20px; height: 20px;
+            box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 40%, transparent);
+        }
+        .anchor-top { top: -8px; left: 50%; transform: translateX(-50%); }
+        .anchor-bottom { bottom: -8px; left: 50%; transform: translateX(-50%); }
+        .anchor-left { left: -8px; top: 50%; transform: translateY(-50%); }
+        .anchor-right { right: -8px; top: 50%; transform: translateY(-50%); }
+        .anchor-top.snap-highlight { top: -10px; }
+        .anchor-bottom.snap-highlight { bottom: -10px; }
+        .anchor-left.snap-highlight { left: -10px; }
+        .anchor-right.snap-highlight { right: -10px; }
+
+        /* Laser mode — freeze everything, override all cursors */
+        body.laser-active, body.laser-active * {
+            cursor: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" fill="%23f38ba8"/><circle cx="12" cy="12" r="8" fill="none" stroke="%23f38ba8" stroke-width="1.5" opacity="0.5"/></svg>') 12 12, crosshair !important;
+        }
+        body.laser-active .canvas-node {
+            pointer-events: none !important;
+        }
+        body.laser-active .anchor-dot {
+            opacity: 0 !important;
+        }
+
+        /* Rubber band selection rectangle */
+        #selection-rect {
+            position: fixed;
+            border: 1.5px dashed var(--blue);
+            background: color-mix(in srgb, var(--blue) 10%, transparent);
+            pointer-events: none;
+            z-index: 9998;
+        }
+    </style>
+
+    <script src="/static/js/tailwindcss.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'rosewater': 'var(--rosewater)', 'flamingo': 'var(--flamingo)',
+                        'pink': 'var(--pink)', 'mauve': 'var(--mauve)',
+                        'red': 'var(--red)', 'maroon': 'var(--maroon)',
+                        'peach': 'var(--peach)', 'yellow': 'var(--yellow)',
+                        'green': 'var(--green)', 'teal': 'var(--teal)',
+                        'sky': 'var(--sky)', 'sapphire': 'var(--sapphire)',
+                        'blue': 'var(--blue)', 'lavender': 'var(--lavender)',
+                        'text': 'var(--text)', 'subtext1': 'var(--subtext1)',
+                        'subtext0': 'var(--subtext0)', 'overlay2': 'var(--overlay2)',
+                        'overlay1': 'var(--overlay1)', 'overlay0': 'var(--overlay0)',
+                        'surface2': 'var(--surface2)', 'surface1': 'var(--surface1)',
+                        'surface0': 'var(--surface0)', 'base': 'var(--base)',
+                        'mantle': 'var(--mantle)', 'crust': 'var(--crust)',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-crust text-text">
+
+    <!-- Canvas Viewport -->
+    <div id="viewport" class="fixed inset-0 overflow-hidden" style="background-image: radial-gradient(circle, color-mix(in srgb, var(--surface0) 40%, var(--crust)) 0.8px, transparent 0.8px); background-size: 20px 20px;">
+        <div id="canvas-transform" style="transform-origin: 0 0; will-change: transform;">
+            <!-- SVG layer for edges -->
+            <svg id="canvas-edges" style="position: absolute; top: 0; left: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none;">
+                <defs>
+                    <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+                        <polygon points="0 0, 8 4, 0 8" fill="var(--overlay0)" />
+                    </marker>
+                </defs>
+            </svg>
+            <!-- Nodes rendered here -->
+        </div>
+    </div>
+
+    <!-- Laser pointer SVG overlay -->
+    <svg id="laser-svg">
+        <path id="laser-path" d="" fill="none" stroke="var(--red)" stroke-width="3"
+              stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0 0 4px var(--red));" />
+    </svg>
+
+    <!-- Bottom Toolbar -->
+    <div id="toolbar" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1 bg-surface0/90 backdrop-blur border border-surface1 rounded-xl px-2 py-1.5 shadow-lg">
+        <button id="btn-add-note" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-subtext1 hover:text-text hover:bg-surface1 transition-colors" title="Add text note">
+            <i data-lucide="sticky-note" class="w-4 h-4"></i>
+            <span>Note</span>
+        </button>
+        <button id="btn-link-file" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-subtext1 hover:text-text hover:bg-surface1 transition-colors" title="Link markdown file">
+            <i data-lucide="file-text" class="w-4 h-4"></i>
+            <span>File</span>
+        </button>
+        <button id="btn-upload" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-subtext1 hover:text-text hover:bg-surface1 transition-colors" title="Upload attachment">
+            <i data-lucide="paperclip" class="w-4 h-4"></i>
+            <span>Attach</span>
+        </button>
+        <div class="w-px h-5 bg-surface1"></div>
+        <button id="btn-laser" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-subtext1 hover:text-text hover:bg-surface1 transition-colors" title="Laser pointer (L)">
+            <i data-lucide="pointer" class="w-4 h-4"></i>
+            <span>Laser</span>
+        </button>
+        <div class="w-px h-5 bg-surface1"></div>
+        <button id="btn-zoom-in" class="p-1.5 rounded-lg text-subtext1 hover:text-text hover:bg-surface1 transition-colors" title="Zoom in">
+            <i data-lucide="zoom-in" class="w-4 h-4"></i>
+        </button>
+        <span id="zoom-level" class="text-xs text-overlay1 w-10 text-center select-none">100%</span>
+        <button id="btn-zoom-out" class="p-1.5 rounded-lg text-subtext1 hover:text-text hover:bg-surface1 transition-colors" title="Zoom out">
+            <i data-lucide="zoom-out" class="w-4 h-4"></i>
+        </button>
+        <button id="btn-zoom-fit" class="p-1.5 rounded-lg text-subtext1 hover:text-text hover:bg-surface1 transition-colors" title="Zoom to fit">
+            <i data-lucide="maximize-2" class="w-4 h-4"></i>
+        </button>
+    </div>
+
+    <!-- File picker modal -->
+    <div id="file-modal" class="fixed inset-0 z-[60] hidden items-center justify-center bg-black/50">
+        <div class="bg-surface0 border border-surface1 rounded-xl p-4 w-96 max-h-[60vh] flex flex-col shadow-xl">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="text-sm font-semibold text-text">Link Markdown File</h3>
+                <button id="file-modal-close" class="text-overlay1 hover:text-text">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+            <input id="file-search" type="text" placeholder="Search files..."
+                   class="w-full px-3 py-2 rounded-lg bg-base border border-surface1 text-text text-sm placeholder-overlay0 focus:outline-none focus:border-blue mb-3">
+            <div id="file-list" class="overflow-y-auto flex-1 space-y-1"></div>
+        </div>
+    </div>
+
+    <!-- Toast notification -->
+    <div id="toast" class="fixed top-4 right-4 z-[70] hidden">
+        <div class="bg-surface0 text-text px-4 py-2 rounded-lg shadow-lg border border-surface1">
+            <span id="toast-message"></span>
+        </div>
+    </div>
+
+    <script src="/static/js/lucide.min.js"></script>
+    <script src="/static/js/marked.min.js"></script>
+    <script src="/static/js/highlight.min.js"></script>
+    <script>
+    // =========================================================================
+    // State
+    // =========================================================================
+    const state = {
+        canvas: { nodes: [], edges: [] },
+        camera: { x: 0, y: 0, zoom: 1 },
+        selectedNodeIds: new Set(),
+        selectionRect: null,
+        dragState: null,
+        resizeState: null,
+        isPanning: false,
+        panStart: { x: 0, y: 0 },
+        spaceHeld: false,
+        laserActive: false,
+        laserDrawing: false,
+        laserPoints: [],
+        laserStrokeStart: 0,
+        laserAnimId: null,
+        edgeDrawing: null,
+        maxZIndex: 0,
+        mdFiles: [],
+        dirty: false,
+    };
+
+    // =========================================================================
+    // DOM refs
+    // =========================================================================
+    const viewport = document.getElementById('viewport');
+    const transform = document.getElementById('canvas-transform');
+    const edgesSvg = document.getElementById('canvas-edges');
+    const laserSvg = document.getElementById('laser-svg');
+    const laserPath = document.getElementById('laser-path');
+
+    // =========================================================================
+    // Marked + Highlight.js setup (v15 API)
+    // =========================================================================
+    marked.use({
+        breaks: true,
+        renderer: {
+            code({ text, lang }) {
+                let highlighted;
+                if (lang && hljs.getLanguage(lang)) {
+                    highlighted = hljs.highlight(text, { language: lang }).value;
+                } else {
+                    highlighted = hljs.highlightAuto(text).value;
+                }
+                return `<pre><code class="hljs${lang ? ' language-' + lang : ''}">${highlighted}</code></pre>`;
+            }
+        }
+    });
+
+    function renderMarkdown(md) {
+        return marked.parse(md || '');
+    }
+
+    // =========================================================================
+    // Camera / Transform
+    // =========================================================================
+    function applyCameraTransform() {
+        const { x, y, zoom } = state.camera;
+        transform.style.transform = `translate(${x}px, ${y}px) scale(${zoom})`;
+        const size = 20 * zoom;
+        viewport.style.backgroundSize = `${size}px ${size}px`;
+        viewport.style.backgroundPosition = `${x}px ${y}px`;
+        document.getElementById('zoom-level').textContent = Math.round(zoom * 100) + '%';
+    }
+
+    function screenToCanvas(sx, sy) {
+        return {
+            x: (sx - state.camera.x) / state.camera.zoom,
+            y: (sy - state.camera.y) / state.camera.zoom,
+        };
+    }
+
+    function zoomAtPoint(sx, sy, newZoom) {
+        newZoom = Math.max(0.1, Math.min(5, newZoom));
+        const before = screenToCanvas(sx, sy);
+        state.camera.zoom = newZoom;
+        state.camera.x = sx - before.x * newZoom;
+        state.camera.y = sy - before.y * newZoom;
+        applyCameraTransform();
+    }
+
+    function zoomToFit() {
+        const nodes = state.canvas.nodes;
+        if (nodes.length === 0) return;
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const n of nodes) {
+            minX = Math.min(minX, n.x);
+            minY = Math.min(minY, n.y);
+            maxX = Math.max(maxX, n.x + n.width);
+            maxY = Math.max(maxY, n.y + n.height);
+        }
+        const pad = 80;
+        const cw = maxX - minX, ch = maxY - minY;
+        const vw = window.innerWidth - pad * 2, vh = window.innerHeight - pad * 2;
+        const zoom = Math.min(vw / cw, vh / ch, 1);
+        state.camera.zoom = zoom;
+        state.camera.x = (window.innerWidth - cw * zoom) / 2 - minX * zoom;
+        state.camera.y = (window.innerHeight - ch * zoom) / 2 - minY * zoom;
+        applyCameraTransform();
+    }
+
+    // =========================================================================
+    // Node rendering
+    // =========================================================================
+    function getNodeById(id) {
+        return state.canvas.nodes.find(n => n.id === id);
+    }
+
+    function renderAllNodes() {
+        transform.querySelectorAll('.canvas-node').forEach(el => el.remove());
+        state.canvas.nodes.forEach((node, i) => renderNode(node, i));
+    }
+
+    function renderNode(nodeData, zIndex) {
+        const el = document.createElement('div');
+        el.className = 'canvas-node';
+        el.dataset.nodeId = nodeData.id;
+        el.style.left = nodeData.x + 'px';
+        el.style.top = nodeData.y + 'px';
+        el.style.width = nodeData.width + 'px';
+        el.style.height = nodeData.height + 'px';
+        el.style.zIndex = zIndex || 0;
+
+        if (nodeData.type === 'group') {
+            el.classList.add('canvas-group');
+        }
+
+        // Content — the only child, clean and simple
+        const content = document.createElement('div');
+        content.className = 'node-content flex-1 overflow-y-auto p-3 text-sm text-text min-h-0';
+        content.addEventListener('wheel', (e) => e.stopPropagation());
+
+        switch (nodeData.type) {
+            case 'text':
+                content.innerHTML = renderMarkdown(nodeData.text);
+                content.addEventListener('dblclick', (e) => {
+                    e.stopPropagation();
+                    startEditingNode(nodeData.id, content);
+                });
+                break;
+            case 'file':
+                content.innerHTML = '<p class="text-overlay1 text-xs italic">Loading...</p>';
+                loadFileContent(nodeData.file, content);
+                break;
+            case 'link':
+                content.innerHTML = `<a href="${nodeData.url}" target="_blank" class="text-blue underline text-xs break-all">${nodeData.url}</a>`;
+                break;
+            case 'group':
+                if (nodeData.label) {
+                    content.innerHTML = `<span class="text-xs text-overlay1 font-medium">${nodeData.label}</span>`;
+                }
+                break;
+        }
+
+        el.appendChild(content);
+
+        // Resize handles
+        ['n','ne','e','se','s','sw','w','nw'].forEach(dir => {
+            const handle = document.createElement('div');
+            handle.className = `resize-handle resize-${dir}`;
+            handle.dataset.direction = dir;
+            el.appendChild(handle);
+        });
+
+        // Anchor dots for edge creation
+        ['top','bottom','left','right'].forEach(side => {
+            const dot = document.createElement('div');
+            dot.className = `anchor-dot anchor-${side}`;
+            dot.dataset.side = side;
+            dot.dataset.nodeId = nodeData.id;
+            dot.addEventListener('pointerdown', onAnchorPointerDown);
+            el.appendChild(dot);
+        });
+
+        transform.appendChild(el);
+        return el;
+    }
+
+    async function loadFileContent(filePath, contentEl) {
+        try {
+            const ext = filePath.split('.').pop().toLowerCase();
+            const imgExts = ['png','jpg','jpeg','gif','svg','webp'];
+            if (imgExts.includes(ext)) {
+                contentEl.innerHTML = `<img src="/api/files/${filePath}" alt="${filePath}" class="max-w-full rounded">`;
+                return;
+            }
+            const resp = await fetch('/api/files/' + filePath);
+            if (!resp.ok) {
+                contentEl.innerHTML = `<p class="text-red text-xs">File not found: ${filePath}</p>`;
+                return;
+            }
+            const text = await resp.text();
+            if (filePath.endsWith('.md')) {
+                contentEl.innerHTML = renderMarkdown(text);
+            } else {
+                contentEl.innerHTML = `<pre class="text-xs"><code>${text}</code></pre>`;
+            }
+        } catch {
+            contentEl.innerHTML = `<p class="text-red text-xs">Error loading file</p>`;
+        }
+    }
+
+    // =========================================================================
+    // Inline editing (text nodes)
+    // =========================================================================
+    function startEditingNode(nodeId, contentEl) {
+        const node = getNodeById(nodeId);
+        if (!node || node.type !== 'text') return;
+        const textarea = document.createElement('textarea');
+        textarea.className = 'w-full h-full bg-base text-text text-sm p-0 border-none outline-none resize-none font-mono';
+        textarea.value = node.text || '';
+        contentEl.innerHTML = '';
+        contentEl.appendChild(textarea);
+        textarea.focus();
+        const finishEdit = () => {
+            node.text = textarea.value;
+            contentEl.innerHTML = renderMarkdown(node.text);
+            contentEl.addEventListener('dblclick', (e) => {
+                e.stopPropagation();
+                startEditingNode(nodeId, contentEl);
+            });
+            markDirty();
+        };
+        textarea.addEventListener('blur', finishEdit);
+        textarea.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') textarea.blur();
+        });
+    }
+
+    // =========================================================================
+    // Edge rendering
+    // =========================================================================
+    function renderAllEdges() {
+        edgesSvg.querySelectorAll('path.edge-path, text.edge-label').forEach(el => el.remove());
+        state.canvas.edges.forEach(edge => renderEdge(edge));
+    }
+
+    function getAnchorPoint(node, side) {
+        const cx = node.x + node.width / 2;
+        const cy = node.y + node.height / 2;
+        switch (side) {
+            case 'top': return { x: cx, y: node.y };
+            case 'bottom': return { x: cx, y: node.y + node.height };
+            case 'left': return { x: node.x, y: cy };
+            case 'right': return { x: node.x + node.width, y: cy };
+            default: return { x: cx, y: cy };
+        }
+    }
+
+    function bestSide(fromNode, toNode) {
+        const dx = (toNode.x + toNode.width/2) - (fromNode.x + fromNode.width/2);
+        const dy = (toNode.y + toNode.height/2) - (fromNode.y + fromNode.height/2);
+        return Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'bottom' : 'top');
+    }
+
+    function generateEdgePath(from, fromSide, to, toSide) {
+        const offset = 80;
+        const cp1 = { ...from }, cp2 = { ...to };
+        const adjust = (cp, side) => {
+            if (side === 'top') cp.y -= offset;
+            else if (side === 'bottom') cp.y += offset;
+            else if (side === 'left') cp.x -= offset;
+            else if (side === 'right') cp.x += offset;
+        };
+        adjust(cp1, fromSide);
+        adjust(cp2, toSide);
+        return `M ${from.x} ${from.y} C ${cp1.x} ${cp1.y}, ${cp2.x} ${cp2.y}, ${to.x} ${to.y}`;
+    }
+
+    function renderEdge(edgeData) {
+        const fromNode = getNodeById(edgeData.fromNode);
+        const toNode = getNodeById(edgeData.toNode);
+        if (!fromNode || !toNode) return;
+
+        const fromSide = edgeData.fromSide || bestSide(fromNode, toNode);
+        const toSide = edgeData.toSide || bestSide(toNode, fromNode);
+        const fromPt = getAnchorPoint(fromNode, fromSide);
+        const toPt = getAnchorPoint(toNode, toSide);
+
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.classList.add('edge-path');
+        path.setAttribute('d', generateEdgePath(fromPt, fromSide, toPt, toSide));
+        path.setAttribute('stroke', 'var(--overlay0)');
+        path.setAttribute('stroke-width', '2');
+        path.setAttribute('fill', 'none');
+        path.dataset.edgeId = edgeData.id;
+
+        if (edgeData.toEnd !== 'none') {
+            path.setAttribute('marker-end', 'url(#arrowhead)');
+        }
+        edgesSvg.appendChild(path);
+
+        if (edgeData.label) {
+            const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            text.classList.add('edge-label');
+            const mid = { x: (fromPt.x + toPt.x) / 2, y: (fromPt.y + toPt.y) / 2 - 8 };
+            text.setAttribute('x', mid.x);
+            text.setAttribute('y', mid.y);
+            text.setAttribute('text-anchor', 'middle');
+            text.setAttribute('fill', 'var(--subtext0)');
+            text.setAttribute('font-size', '11');
+            text.setAttribute('font-family', 'Inter, sans-serif');
+            text.textContent = edgeData.label;
+            edgesSvg.appendChild(text);
+        }
+    }
+
+    function updateEdgesForNode(nodeId) {
+        state.canvas.edges.forEach(edge => {
+            if (edge.fromNode !== nodeId && edge.toNode !== nodeId) return;
+            const pathEl = edgesSvg.querySelector(`[data-edge-id="${edge.id}"]`);
+            if (!pathEl) return;
+            const fromNode = getNodeById(edge.fromNode);
+            const toNode = getNodeById(edge.toNode);
+            if (!fromNode || !toNode) return;
+            const fromSide = edge.fromSide || bestSide(fromNode, toNode);
+            const toSide = edge.toSide || bestSide(toNode, fromNode);
+            pathEl.setAttribute('d', generateEdgePath(
+                getAnchorPoint(fromNode, fromSide), fromSide,
+                getAnchorPoint(toNode, toSide), toSide
+            ));
+            // Update label position too
+            const labelEl = pathEl.nextElementSibling;
+            if (labelEl && labelEl.classList.contains('edge-label')) {
+                const fromPt = getAnchorPoint(fromNode, fromSide);
+                const toPt = getAnchorPoint(toNode, toSide);
+                labelEl.setAttribute('x', (fromPt.x + toPt.x) / 2);
+                labelEl.setAttribute('y', (fromPt.y + toPt.y) / 2 - 8);
+            }
+        });
+    }
+
+    // =========================================================================
+    // Edge drawing (from anchor dots)
+    // =========================================================================
+    const SNAP_MARGIN = 40; // px in canvas coords — proximity zone around each node
+
+    function findNearestAnchor(canvasX, canvasY, excludeNodeId) {
+        let best = null;
+        let bestDist = Infinity;
+        const sides = ['top', 'bottom', 'left', 'right'];
+        for (const node of state.canvas.nodes) {
+            if (node.id === excludeNodeId) continue;
+            // Expand the node rect by SNAP_MARGIN to create a proximity zone
+            const inZone = canvasX >= node.x - SNAP_MARGIN && canvasX <= node.x + node.width + SNAP_MARGIN &&
+                           canvasY >= node.y - SNAP_MARGIN && canvasY <= node.y + node.height + SNAP_MARGIN;
+            if (!inZone) continue;
+            for (const side of sides) {
+                const pt = getAnchorPoint(node, side);
+                const dist = Math.hypot(canvasX - pt.x, canvasY - pt.y);
+                if (dist < bestDist) {
+                    bestDist = dist;
+                    best = { nodeId: node.id, side, x: pt.x, y: pt.y };
+                }
+            }
+        }
+        return best;
+    }
+
+    function onAnchorPointerDown(e) {
+        e.stopPropagation();
+        e.preventDefault();
+        state.edgeDrawing = {
+            fromNodeId: e.target.dataset.nodeId,
+            fromSide: e.target.dataset.side,
+            snapTarget: null,
+        };
+        const tempLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        tempLine.id = 'temp-edge-line';
+        tempLine.setAttribute('stroke', 'var(--blue)');
+        tempLine.setAttribute('stroke-width', '2');
+        tempLine.setAttribute('stroke-dasharray', '6 3');
+        const fromNode = getNodeById(state.edgeDrawing.fromNodeId);
+        const pt = getAnchorPoint(fromNode, state.edgeDrawing.fromSide);
+        tempLine.setAttribute('x1', pt.x);
+        tempLine.setAttribute('y1', pt.y);
+        tempLine.setAttribute('x2', pt.x);
+        tempLine.setAttribute('y2', pt.y);
+        edgesSvg.appendChild(tempLine);
+    }
+
+    // =========================================================================
+    // Panning — disabled when laser is active
+    // =========================================================================
+    viewport.addEventListener('pointerdown', (e) => {
+        if (state.laserActive) return;
+        if (e.target.closest('.canvas-node') && !state.spaceHeld) return;
+        if (e.target.closest('#toolbar') || e.target.closest('#file-modal')) return;
+
+        // Shift+drag on background: rubber band selection
+        if (e.shiftKey && !state.spaceHeld) {
+            state.selectionRect = {
+                startX: e.clientX,
+                startY: e.clientY,
+                pointerId: e.pointerId,
+            };
+            const rect = document.createElement('div');
+            rect.id = 'selection-rect';
+            rect.style.left = e.clientX + 'px';
+            rect.style.top = e.clientY + 'px';
+            rect.style.width = '0px';
+            rect.style.height = '0px';
+            document.body.appendChild(rect);
+            viewport.setPointerCapture(e.pointerId);
+            return;
+        }
+
+        // Click on background without shift: clear selection
+        state.selectedNodeIds.clear();
+        document.querySelectorAll('.canvas-node.selected').forEach(el => el.classList.remove('selected'));
+
+        state.isPanning = true;
+        state.panStart = { x: e.clientX - state.camera.x, y: e.clientY - state.camera.y };
+        viewport.style.cursor = 'grabbing';
+        viewport.setPointerCapture(e.pointerId);
+    });
+
+    viewport.addEventListener('pointermove', (e) => {
+        // Rubber band selection
+        if (state.selectionRect) {
+            const sr = state.selectionRect;
+            const rectEl = document.getElementById('selection-rect');
+            if (!rectEl) return;
+            const x = Math.min(sr.startX, e.clientX);
+            const y = Math.min(sr.startY, e.clientY);
+            const w = Math.abs(e.clientX - sr.startX);
+            const h = Math.abs(e.clientY - sr.startY);
+            rectEl.style.left = x + 'px';
+            rectEl.style.top = y + 'px';
+            rectEl.style.width = w + 'px';
+            rectEl.style.height = h + 'px';
+
+            // Test intersection with all nodes
+            const selRect = { left: x, top: y, right: x + w, bottom: y + h };
+            state.selectedNodeIds.clear();
+            document.querySelectorAll('.canvas-node').forEach(nodeEl => {
+                const br = nodeEl.getBoundingClientRect();
+                const intersects = !(br.right < selRect.left || br.left > selRect.right ||
+                                     br.bottom < selRect.top || br.top > selRect.bottom);
+                if (intersects) {
+                    nodeEl.classList.add('selected');
+                    state.selectedNodeIds.add(nodeEl.dataset.nodeId);
+                } else {
+                    nodeEl.classList.remove('selected');
+                }
+            });
+            return;
+        }
+
+        if (state.edgeDrawing) {
+            const canvasPt = screenToCanvas(e.clientX, e.clientY);
+            const tempLine = document.getElementById('temp-edge-line');
+            if (!tempLine) return;
+
+            // Remove previous snap highlight
+            const prevHighlight = document.querySelector('.anchor-dot.snap-highlight');
+            if (prevHighlight) prevHighlight.classList.remove('snap-highlight');
+
+            const snap = findNearestAnchor(canvasPt.x, canvasPt.y, state.edgeDrawing.fromNodeId);
+            state.edgeDrawing.snapTarget = snap;
+
+            if (snap) {
+                tempLine.setAttribute('x2', snap.x);
+                tempLine.setAttribute('y2', snap.y);
+                // Highlight the target anchor dot
+                const targetNode = document.querySelector(`[data-node-id="${snap.nodeId}"]`);
+                if (targetNode) {
+                    const dot = targetNode.querySelector(`.anchor-${snap.side}`);
+                    if (dot) dot.classList.add('snap-highlight');
+                }
+            } else {
+                tempLine.setAttribute('x2', canvasPt.x);
+                tempLine.setAttribute('y2', canvasPt.y);
+            }
+            return;
+        }
+        if (!state.isPanning) return;
+        state.camera.x = e.clientX - state.panStart.x;
+        state.camera.y = e.clientY - state.panStart.y;
+        applyCameraTransform();
+    });
+
+    viewport.addEventListener('pointerup', (e) => {
+        // Rubber band selection end
+        if (state.selectionRect) {
+            const rectEl = document.getElementById('selection-rect');
+            if (rectEl) rectEl.remove();
+            state.selectionRect = null;
+            viewport.releasePointerCapture(e.pointerId);
+            return;
+        }
+
+        if (state.edgeDrawing) {
+            const tempLine = document.getElementById('temp-edge-line');
+            if (tempLine) tempLine.remove();
+            const highlight = document.querySelector('.anchor-dot.snap-highlight');
+            if (highlight) highlight.classList.remove('snap-highlight');
+
+            const snap = state.edgeDrawing.snapTarget;
+            if (snap && snap.nodeId !== state.edgeDrawing.fromNodeId) {
+                const newEdge = {
+                    id: generateId(),
+                    fromNode: state.edgeDrawing.fromNodeId,
+                    fromSide: state.edgeDrawing.fromSide,
+                    toNode: snap.nodeId,
+                    toSide: snap.side,
+                    fromEnd: 'none',
+                    toEnd: 'arrow',
+                };
+                state.canvas.edges.push(newEdge);
+                renderEdge(newEdge);
+                markDirty();
+            }
+            state.edgeDrawing = null;
+            return;
+        }
+        if (state.isPanning) {
+            state.isPanning = false;
+            viewport.style.cursor = '';
+            viewport.releasePointerCapture(e.pointerId);
+        }
+    });
+
+    // =========================================================================
+    // Zoom (wheel + trackpad) — works even in laser mode
+    // =========================================================================
+    viewport.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        if (e.ctrlKey) {
+            const factor = Math.exp(-e.deltaY * 0.01);
+            zoomAtPoint(e.clientX, e.clientY, state.camera.zoom * factor);
+        } else {
+            state.camera.x -= e.deltaX;
+            state.camera.y -= e.deltaY;
+            applyCameraTransform();
+        }
+    }, { passive: false });
+
+    // =========================================================================
+    // Node drag & resize
+    // =========================================================================
+    document.addEventListener('pointerdown', (e) => {
+        if (state.laserActive) return;
+        const nodeEl = e.target.closest('.canvas-node');
+        if (!nodeEl) return;
+
+        const nodeId = nodeEl.dataset.nodeId;
+
+        if (e.shiftKey) {
+            // Shift+click: toggle node in/out of selection
+            if (state.selectedNodeIds.has(nodeId)) {
+                state.selectedNodeIds.delete(nodeId);
+                nodeEl.classList.remove('selected');
+            } else {
+                state.selectedNodeIds.add(nodeId);
+                nodeEl.classList.add('selected');
+            }
+        } else {
+            // Click without shift: if node is already selected (multi-select), keep selection for drag
+            if (!state.selectedNodeIds.has(nodeId)) {
+                document.querySelectorAll('.canvas-node.selected').forEach(el => el.classList.remove('selected'));
+                state.selectedNodeIds.clear();
+                state.selectedNodeIds.add(nodeId);
+                nodeEl.classList.add('selected');
+            }
+        }
+
+        state.maxZIndex++;
+        nodeEl.style.zIndex = state.maxZIndex;
+
+        // Resize handle
+        if (e.target.classList.contains('resize-handle')) {
+            e.stopPropagation();
+            state.resizeState = {
+                nodeEl,
+                nodeId: nodeEl.dataset.nodeId,
+                dir: e.target.dataset.direction,
+                startMouseX: e.clientX,
+                startMouseY: e.clientY,
+                startLeft: parseFloat(nodeEl.style.left),
+                startTop: parseFloat(nodeEl.style.top),
+                startWidth: parseFloat(nodeEl.style.width),
+                startHeight: parseFloat(nodeEl.style.height),
+            };
+            e.target.setPointerCapture(e.pointerId);
+            return;
+        }
+
+        // Anchor dot
+        if (e.target.classList.contains('anchor-dot')) return;
+
+        // Don't start drag from inside a textarea
+        if (e.target.closest('textarea')) return;
+
+        // Node drag — store start positions for all selected nodes
+        e.stopPropagation();
+        const startPositions = {};
+        for (const id of state.selectedNodeIds) {
+            const n = getNodeById(id);
+            if (n) startPositions[id] = { x: n.x, y: n.y };
+        }
+        state.dragState = {
+            nodeEl,
+            nodeId: nodeId,
+            pointerId: e.pointerId,
+            startMouseX: e.clientX,
+            startMouseY: e.clientY,
+            startPositions,
+            activated: false,
+        };
+    });
+
+    document.addEventListener('pointermove', (e) => {
+        if (state.dragState) {
+            const rawDx = e.clientX - state.dragState.startMouseX;
+            const rawDy = e.clientY - state.dragState.startMouseY;
+            // Activate drag only after 3px movement threshold
+            if (!state.dragState.activated) {
+                if (Math.abs(rawDx) < 3 && Math.abs(rawDy) < 3) return;
+                state.dragState.activated = true;
+                state.dragState.nodeEl.classList.add('dragging');
+                state.dragState.nodeEl.setPointerCapture(state.dragState.pointerId);
+            }
+            const dx = rawDx / state.camera.zoom;
+            const dy = rawDy / state.camera.zoom;
+
+            // Move all selected nodes
+            for (const id of state.selectedNodeIds) {
+                const startPos = state.dragState.startPositions[id];
+                if (!startPos) continue;
+                const newX = startPos.x + dx;
+                const newY = startPos.y + dy;
+                const node = getNodeById(id);
+                if (node) { node.x = newX; node.y = newY; }
+                const el = document.querySelector(`[data-node-id="${id}"]`);
+                if (el) {
+                    el.style.left = newX + 'px';
+                    el.style.top = newY + 'px';
+                }
+                updateEdgesForNode(id);
+            }
+        }
+
+        if (state.resizeState) {
+            const rs = state.resizeState;
+            const dx = (e.clientX - rs.startMouseX) / state.camera.zoom;
+            const dy = (e.clientY - rs.startMouseY) / state.camera.zoom;
+            const MIN = 60;
+            let { startLeft, startTop, startWidth, startHeight } = rs;
+            let nL = startLeft, nT = startTop, nW = startWidth, nH = startHeight;
+            if (rs.dir.includes('e')) nW = Math.max(MIN, startWidth + dx);
+            if (rs.dir.includes('w')) { nW = Math.max(MIN, startWidth - dx); nL = startLeft + (startWidth - nW); }
+            if (rs.dir.includes('s')) nH = Math.max(MIN, startHeight + dy);
+            if (rs.dir.includes('n')) { nH = Math.max(MIN, startHeight - dy); nT = startTop + (startHeight - nH); }
+            rs.nodeEl.style.left = nL + 'px';
+            rs.nodeEl.style.top = nT + 'px';
+            rs.nodeEl.style.width = nW + 'px';
+            rs.nodeEl.style.height = nH + 'px';
+            // Update data model immediately so edges follow
+            const node = getNodeById(rs.nodeId);
+            if (node) { node.x = nL; node.y = nT; node.width = nW; node.height = nH; }
+            updateEdgesForNode(rs.nodeId);
+        }
+    });
+
+    document.addEventListener('pointerup', (e) => {
+        if (state.dragState) {
+            state.dragState.nodeEl.classList.remove('dragging');
+            state.dragState = null;
+            markDirty();
+        }
+        if (state.resizeState) {
+            state.resizeState = null;
+            markDirty();
+        }
+    });
+
+    // =========================================================================
+    // Keyboard
+    // =========================================================================
+    document.addEventListener('keydown', (e) => {
+        if (e.target.closest('textarea, input')) return;
+        if (e.key === ' ') {
+            e.preventDefault();
+            state.spaceHeld = true;
+            viewport.style.cursor = 'grab';
+        }
+        if (e.key === 'l' || e.key === 'L') toggleLaser();
+        if (e.key === 'Escape') {
+            if (state.laserActive) { toggleLaser(); return; }
+            document.querySelectorAll('.canvas-node.selected').forEach(el => el.classList.remove('selected'));
+            state.selectedNodeIds.clear();
+        }
+        if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedNodeIds.size > 0) deleteSelectedNodes();
+        if ((e.metaKey || e.ctrlKey) && (e.key === '=' || e.key === '+')) {
+            e.preventDefault();
+            zoomAtPoint(window.innerWidth/2, window.innerHeight/2, state.camera.zoom * 1.2);
+        }
+        if ((e.metaKey || e.ctrlKey) && e.key === '-') {
+            e.preventDefault();
+            zoomAtPoint(window.innerWidth/2, window.innerHeight/2, state.camera.zoom / 1.2);
+        }
+        if ((e.metaKey || e.ctrlKey) && e.key === '0') {
+            e.preventDefault();
+            state.camera = { x: 0, y: 0, zoom: 1 };
+            applyCameraTransform();
+        }
+    });
+
+    document.addEventListener('keyup', (e) => {
+        if (e.key === ' ') {
+            state.spaceHeld = false;
+            viewport.style.cursor = '';
+        }
+    });
+
+    // =========================================================================
+    // Laser pointer
+    // =========================================================================
+    function toggleLaser() {
+        state.laserActive = !state.laserActive;
+        const btn = document.getElementById('btn-laser');
+        if (state.laserActive) {
+            btn.classList.remove('text-subtext1');
+            btn.classList.add('bg-surface1', 'text-red');
+            document.body.classList.add('laser-active');
+            laserSvg.style.display = 'block';
+        } else {
+            btn.classList.remove('bg-surface1', 'text-red');
+            btn.classList.add('text-subtext1');
+            document.body.classList.remove('laser-active');
+            laserPath.setAttribute('d', '');
+            state.laserPoints = [];
+            state.laserDrawing = false;
+            if (state.laserAnimId) cancelAnimationFrame(state.laserAnimId);
+            laserSvg.style.display = 'none';
+        }
+    }
+
+    // Laser events on the viewport directly
+    viewport.addEventListener('pointerdown', (e) => {
+        if (!state.laserActive) return;
+        if (e.target.closest('#toolbar')) return;
+        e.preventDefault();
+        state.laserDrawing = true;
+        state.laserStrokeStart = state.laserPoints.length;
+        // null marker separates strokes so they don't connect
+        if (state.laserPoints.length > 0) state.laserPoints.push(null);
+        state.laserPoints.push({ x: e.clientX, y: e.clientY, t: performance.now() });
+        animateLaser();
+    });
+
+    viewport.addEventListener('pointermove', (e) => {
+        if (!state.laserActive || !state.laserDrawing) return;
+        state.laserPoints.push({ x: e.clientX, y: e.clientY, t: performance.now() });
+    });
+
+    viewport.addEventListener('pointerup', () => {
+        if (state.laserActive && state.laserDrawing) {
+            state.laserDrawing = false;
+            // Shift only the current stroke's timestamps so decay starts now
+            const now = performance.now();
+            const start = state.laserStrokeStart;
+            let oldest = Infinity;
+            for (let i = start; i < state.laserPoints.length; i++) {
+                if (state.laserPoints[i] && state.laserPoints[i].t < oldest) oldest = state.laserPoints[i].t;
+            }
+            if (oldest < Infinity) {
+                const shift = now - oldest;
+                for (let i = start; i < state.laserPoints.length; i++) {
+                    if (state.laserPoints[i]) state.laserPoints[i].t += shift;
+                }
+            }
+        }
+    });
+
+    function animateLaser() {
+        const now = performance.now();
+        const DECAY = 1200;
+        // Remove fully decayed points (but never filter while actively drawing that stroke)
+        const activeStart = state.laserDrawing ? state.laserStrokeStart : state.laserPoints.length;
+        state.laserPoints = state.laserPoints.filter((p, i) => {
+            if (p === null) return true; // keep separators (cleaned below)
+            if (i >= activeStart) return true; // keep active stroke points
+            return now - p.t < DECAY;
+        });
+        // Clean up leading/consecutive/trailing null separators
+        while (state.laserPoints.length > 0 && state.laserPoints[0] === null) state.laserPoints.shift();
+        for (let i = state.laserPoints.length - 1; i > 0; i--) {
+            if (state.laserPoints[i] === null && state.laserPoints[i-1] === null) state.laserPoints.splice(i, 1);
+        }
+        while (state.laserPoints.length > 0 && state.laserPoints[state.laserPoints.length - 1] === null) state.laserPoints.pop();
+        // Recalculate activeStart after filtering
+        if (state.laserDrawing) {
+            // Find the last null separator — active stroke starts after it
+            let lastNull = -1;
+            for (let i = 0; i < state.laserPoints.length; i++) {
+                if (state.laserPoints[i] === null) lastNull = i;
+            }
+            state.laserStrokeStart = lastNull + 1;
+        }
+
+        if (state.laserPoints.filter(p => p !== null).length < 2) {
+            laserPath.setAttribute('d', '');
+            if (state.laserPoints.length === 0 && !state.laserDrawing) return;
+            state.laserAnimId = requestAnimationFrame(animateLaser);
+            return;
+        }
+
+        // Build path with multiple strokes separated by nulls
+        let d = '';
+        for (let i = 0; i < state.laserPoints.length; i++) {
+            const p = state.laserPoints[i];
+            if (p === null) continue;
+            const prev = i > 0 ? state.laserPoints[i - 1] : null;
+            if (prev === null || i === 0) {
+                d += `M ${p.x} ${p.y} `;
+            } else {
+                d += `L ${p.x} ${p.y} `;
+            }
+        }
+        laserPath.setAttribute('d', d);
+
+        state.laserAnimId = requestAnimationFrame(animateLaser);
+    }
+
+    // Laser button click handler
+    document.getElementById('btn-laser').addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleLaser();
+    });
+
+    // =========================================================================
+    // Toolbar actions
+    // =========================================================================
+    function generateId() {
+        return crypto.randomUUID().replace(/-/g, '').slice(0, 16);
+    }
+
+    document.getElementById('btn-add-note').addEventListener('click', () => {
+        const center = screenToCanvas(window.innerWidth / 2, window.innerHeight / 2);
+        const node = {
+            id: generateId(),
+            type: 'text',
+            x: Math.round(center.x - 150),
+            y: Math.round(center.y - 75),
+            width: 300,
+            height: 150,
+            text: '# New Note\n\nStart typing...',
+        };
+        state.canvas.nodes.push(node);
+        renderNode(node, state.canvas.nodes.length);
+        markDirty();
+    });
+
+    document.getElementById('btn-link-file').addEventListener('click', async () => {
+        const modal = document.getElementById('file-modal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        const search = document.getElementById('file-search');
+        search.value = '';
+        search.focus();
+        try {
+            const resp = await fetch('/api/md-files');
+            state.mdFiles = await resp.json();
+        } catch { state.mdFiles = []; }
+        renderFileList('');
+    });
+
+    document.getElementById('file-modal-close').addEventListener('click', () => {
+        document.getElementById('file-modal').classList.add('hidden');
+        document.getElementById('file-modal').classList.remove('flex');
+    });
+
+    document.getElementById('file-search').addEventListener('input', (e) => {
+        renderFileList(e.target.value);
+    });
+
+    function renderFileList(query) {
+        const list = document.getElementById('file-list');
+        const filtered = state.mdFiles.filter(f => f.toLowerCase().includes(query.toLowerCase()));
+        list.innerHTML = filtered.map(f => `
+            <button class="w-full text-left px-3 py-2 rounded-lg text-sm text-text hover:bg-surface1 transition-colors truncate" data-file="${f}">
+                ${f}
+            </button>
+        `).join('');
+        list.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const filePath = btn.dataset.file;
+                const center = screenToCanvas(window.innerWidth / 2, window.innerHeight / 2);
+                const node = {
+                    id: generateId(),
+                    type: 'file',
+                    x: Math.round(center.x - 150),
+                    y: Math.round(center.y - 100),
+                    width: 300,
+                    height: 200,
+                    file: filePath,
+                };
+                state.canvas.nodes.push(node);
+                renderNode(node, state.canvas.nodes.length);
+                markDirty();
+                document.getElementById('file-modal').classList.add('hidden');
+                document.getElementById('file-modal').classList.remove('flex');
+            });
+        });
+    }
+
+    document.getElementById('btn-upload').addEventListener('click', () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*,.pdf,.svg';
+        input.addEventListener('change', async () => {
+            const file = input.files[0];
+            if (!file) return;
+            const form = new FormData();
+            form.append('file', file);
+            try {
+                const resp = await fetch('/api/upload', { method: 'POST', body: form });
+                if (!resp.ok) throw new Error('Upload failed');
+                const result = await resp.json();
+                const center = screenToCanvas(window.innerWidth / 2, window.innerHeight / 2);
+                const node = {
+                    id: generateId(),
+                    type: 'file',
+                    x: Math.round(center.x - 150),
+                    y: Math.round(center.y - 100),
+                    width: 300,
+                    height: 200,
+                    file: result.path,
+                };
+                state.canvas.nodes.push(node);
+                renderNode(node, state.canvas.nodes.length);
+                markDirty();
+                showToast('Uploaded: ' + result.filename, 'success');
+            } catch {
+                showToast('Upload failed', 'error');
+            }
+        });
+        input.click();
+    });
+
+    document.getElementById('btn-zoom-in').addEventListener('click', () => {
+        zoomAtPoint(window.innerWidth/2, window.innerHeight/2, state.camera.zoom * 1.2);
+    });
+    document.getElementById('btn-zoom-out').addEventListener('click', () => {
+        zoomAtPoint(window.innerWidth/2, window.innerHeight/2, state.camera.zoom / 1.2);
+    });
+    document.getElementById('btn-zoom-fit').addEventListener('click', zoomToFit);
+
+    // =========================================================================
+    // Delete node
+    // =========================================================================
+    function deleteSelectedNodes() {
+        if (state.selectedNodeIds.size === 0) return;
+        for (const id of state.selectedNodeIds) {
+            state.canvas.nodes = state.canvas.nodes.filter(n => n.id !== id);
+            state.canvas.edges = state.canvas.edges.filter(e => e.fromNode !== id && e.toNode !== id);
+            const el = document.querySelector(`[data-node-id="${id}"]`);
+            if (el) el.remove();
+        }
+        renderAllEdges();
+        state.selectedNodeIds.clear();
+        markDirty();
+    }
+
+    // =========================================================================
+    // Double-click to create note
+    // =========================================================================
+    viewport.addEventListener('dblclick', (e) => {
+        if (state.laserActive) return;
+        if (e.target.closest('.canvas-node') || e.target.closest('#toolbar')) return;
+        const pos = screenToCanvas(e.clientX, e.clientY);
+        const node = {
+            id: generateId(),
+            type: 'text',
+            x: Math.round(pos.x - 150),
+            y: Math.round(pos.y - 75),
+            width: 300,
+            height: 150,
+            text: '',
+        };
+        state.canvas.nodes.push(node);
+        const el = renderNode(node, state.canvas.nodes.length);
+        markDirty();
+        const content = el.querySelector('.node-content');
+        startEditingNode(node.id, content);
+    });
+
+    // =========================================================================
+    // Save / dirty state
+    // =========================================================================
+    function markDirty() {
+        state.dirty = true;
+        scheduleSave();
+    }
+
+    let saveTimeout = null;
+    function scheduleSave() {
+        if (saveTimeout) clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(saveCanvas, 2000);
+    }
+
+    async function saveCanvas() {
+        if (!state.dirty) return;
+        try {
+            const resp = await fetch('/api/canvas', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(state.canvas),
+            });
+            if (resp.ok) state.dirty = false;
+        } catch (err) {
+            console.error('Failed to save canvas:', err);
+        }
+    }
+
+    // =========================================================================
+    // Toast
+    // =========================================================================
+    function showToast(message, type) {
+        const toast = document.getElementById('toast');
+        const msg = document.getElementById('toast-message');
+        msg.textContent = message;
+        const colors = { info: 'text-blue', success: 'text-green', error: 'text-red', warning: 'text-yellow' };
+        msg.className = colors[type] || colors.info;
+        toast.classList.remove('hidden');
+        setTimeout(() => toast.classList.add('hidden'), 3000);
+    }
+
+    // =========================================================================
+    // Init
+    // =========================================================================
+    async function init() {
+        try {
+            const resp = await fetch('/api/canvas');
+            state.canvas = await resp.json();
+            if (!state.canvas.nodes) state.canvas.nodes = [];
+            if (!state.canvas.edges) state.canvas.edges = [];
+        } catch {
+            showToast('Failed to load canvas', 'error');
+            state.canvas = { nodes: [], edges: [] };
+        }
+
+        renderAllNodes();
+        renderAllEdges();
+        applyCameraTransform();
+
+        if (state.canvas.nodes.length > 0) zoomToFit();
+
+        lucide.createIcons();
+    }
+
+    init();
+    </script>
+</body>
+</html>
