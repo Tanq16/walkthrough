@@ -40,13 +40,11 @@ func (s *Server) Setup() error {
 		return err
 	}
 
-	// Ensure attachments directory exists
 	attachDir := filepath.Join(s.dataDir, "attachments")
 	if err := os.MkdirAll(attachDir, 0755); err != nil {
 		return fmt.Errorf("failed to create attachments dir: %w", err)
 	}
 
-	// Ensure data.json exists
 	dataPath := filepath.Join(s.dataDir, "data.json")
 	if _, err := os.Stat(dataPath); os.IsNotExist(err) {
 		emptyCanvas := []byte(`{"nodes":[],"edges":[]}`)
@@ -56,17 +54,14 @@ func (s *Server) Setup() error {
 		log.Printf("INFO [server] Created empty canvas at %s", dataPath)
 	}
 
-	// Static assets
 	s.mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
 
-	// API routes
 	s.mux.HandleFunc("GET /api/canvas", s.handleGetCanvas)
 	s.mux.HandleFunc("PUT /api/canvas", s.handlePutCanvas)
 	s.mux.HandleFunc("GET /api/md-files", s.handleListMDFiles)
 	s.mux.HandleFunc("GET /api/files/{path...}", s.handleGetFile)
 	s.mux.HandleFunc("POST /api/upload", s.handleUpload)
 
-	// Serve index.html at root
 	s.mux.HandleFunc("/", s.handleIndex)
 
 	return nil
@@ -100,13 +95,12 @@ func (s *Server) handleGetCanvas(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handlePutCanvas(w http.ResponseWriter, r *http.Request) {
-	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 10<<20)) // 10MB max
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 10<<20))
 	if err != nil {
 		http.Error(w, "Request too large", http.StatusRequestEntityTooLarge)
 		return
 	}
 
-	// Validate JSON structure
 	var canvas map[string]interface{}
 	if err := json.Unmarshal(body, &canvas); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
@@ -129,11 +123,9 @@ func (s *Server) handleListMDFiles(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return nil
 		}
-		// Skip hidden directories
 		if d.IsDir() && strings.HasPrefix(d.Name(), ".") {
 			return filepath.SkipDir
 		}
-		// Skip attachments directory
 		if d.IsDir() && d.Name() == "attachments" {
 			return filepath.SkipDir
 		}
@@ -155,7 +147,6 @@ func (s *Server) handleGetFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Prevent path traversal
 	cleanPath := filepath.Clean(reqPath)
 	if strings.Contains(cleanPath, "..") {
 		http.Error(w, "Invalid path", http.StatusBadRequest)
@@ -164,7 +155,6 @@ func (s *Server) handleGetFile(w http.ResponseWriter, r *http.Request) {
 
 	fullPath := filepath.Join(s.dataDir, cleanPath)
 
-	// Verify the resolved path is within dataDir
 	absData, _ := filepath.Abs(s.dataDir)
 	absFile, _ := filepath.Abs(fullPath)
 	if !strings.HasPrefix(absFile, absData) {
@@ -178,7 +168,6 @@ func (s *Server) handleGetFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Detect content type
 	ext := strings.ToLower(filepath.Ext(fullPath))
 	switch ext {
 	case ".md":
@@ -201,7 +190,7 @@ func (s *Server) handleGetFile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, 50<<20) // 50MB max
+	r.Body = http.MaxBytesReader(w, r.Body, 50<<20)
 	if err := r.ParseMultipartForm(50 << 20); err != nil {
 		http.Error(w, "File too large", http.StatusRequestEntityTooLarge)
 		return
@@ -214,7 +203,6 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	// Generate unique filename
 	ext := filepath.Ext(header.Filename)
 	newName := uuid.New().String() + ext
 	attachDir := filepath.Join(s.dataDir, "attachments")

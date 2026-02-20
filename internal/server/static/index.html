@@ -8,7 +8,6 @@
     <link rel="stylesheet" href="/static/css/inter.css">
     <link rel="stylesheet" href="/static/css/github-dark.min.css">
 
-    <!-- Catppuccin Mocha Theme -->
     <style>
         :root {
             --rosewater: #f5e0dc; --flamingo: #f2cdcd; --pink: #f5c2e7;
@@ -23,7 +22,6 @@
         }
         body { font-family: 'Inter', sans-serif; margin: 0; overflow: hidden; }
 
-        /* Clean node styling */
         .canvas-node {
             position: absolute;
             background: var(--base);
@@ -45,7 +43,6 @@
             border-color: var(--surface1);
         }
 
-        /* Markdown content */
         .node-content h1, .node-content h2, .node-content h3,
         .node-content h4, .node-content h5, .node-content h6 {
             color: var(--text); margin: 0.4em 0 0.2em 0; line-height: 1.3;
@@ -85,10 +82,8 @@
         }
         .node-content th { background: var(--surface0); font-weight: 600; }
 
-        /* Highlight.js Catppuccin overrides */
         .hljs { background: var(--mantle) !important; color: var(--text) !important; }
 
-        /* Resize handles */
         .resize-handle { position: absolute; z-index: 10; opacity: 0; transition: opacity 0.15s; }
         .canvas-node:hover .resize-handle, .canvas-node.selected .resize-handle { opacity: 1; }
         .resize-n  { top: -3px; left: 10px; right: 10px; height: 6px; cursor: ns-resize; }
@@ -100,19 +95,16 @@
         .resize-se { bottom: -4px; right: -4px; width: 8px; height: 8px; cursor: nwse-resize; }
         .resize-sw { bottom: -4px; left: -4px; width: 8px; height: 8px; cursor: nesw-resize; }
 
-        /* Laser pointer trail — stroke only, no fill */
         #laser-svg {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             pointer-events: none; z-index: 9999; display: none;
         }
 
-        /* Node content clip — needed because .canvas-node is overflow:visible for anchor dots */
         .node-content {
             border-radius: 8px;
             overflow: hidden;
         }
 
-        /* Edge anchor dots */
         .anchor-dot {
             position: absolute; width: 16px; height: 16px; border-radius: 50%;
             background: var(--blue); border: 2px solid var(--base);
@@ -133,7 +125,6 @@
         .anchor-left.snap-highlight { left: -10px; }
         .anchor-right.snap-highlight { right: -10px; }
 
-        /* Laser mode — freeze everything, override all cursors */
         body.laser-active, body.laser-active * {
             cursor: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" fill="%23f38ba8"/><circle cx="12" cy="12" r="8" fill="none" stroke="%23f38ba8" stroke-width="1.5" opacity="0.5"/></svg>') 12 12, crosshair !important;
         }
@@ -144,7 +135,6 @@
             opacity: 0 !important;
         }
 
-        /* Rubber band selection rectangle */
         #selection-rect {
             position: fixed;
             border: 1.5px dashed var(--blue);
@@ -181,10 +171,8 @@
 </head>
 <body class="bg-crust text-text">
 
-    <!-- Canvas Viewport -->
     <div id="viewport" class="fixed inset-0 overflow-hidden" style="background-image: radial-gradient(circle, color-mix(in srgb, var(--surface0) 40%, var(--crust)) 0.8px, transparent 0.8px); background-size: 20px 20px;">
         <div id="canvas-transform" style="transform-origin: 0 0; will-change: transform;">
-            <!-- SVG layer for edges -->
             <svg id="canvas-edges" style="position: absolute; top: 0; left: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none;">
                 <defs>
                     <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
@@ -192,17 +180,14 @@
                     </marker>
                 </defs>
             </svg>
-            <!-- Nodes rendered here -->
         </div>
     </div>
 
-    <!-- Laser pointer SVG overlay -->
     <svg id="laser-svg">
         <path id="laser-path" d="" fill="none" stroke="var(--red)" stroke-width="3"
               stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0 0 4px var(--red));" />
     </svg>
 
-    <!-- Bottom Toolbar -->
     <div id="toolbar" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1 bg-surface0/90 backdrop-blur border border-surface1 rounded-xl px-2 py-1.5 shadow-lg">
         <button id="btn-add-note" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-subtext1 hover:text-text hover:bg-surface1 transition-colors" title="Add text note">
             <i data-lucide="sticky-note" class="w-4 h-4"></i>
@@ -234,7 +219,6 @@
         </button>
     </div>
 
-    <!-- File picker modal -->
     <div id="file-modal" class="fixed inset-0 z-[60] hidden items-center justify-center bg-black/50">
         <div class="bg-surface0 border border-surface1 rounded-xl p-4 w-96 max-h-[60vh] flex flex-col shadow-xl">
             <div class="flex items-center justify-between mb-3">
@@ -249,7 +233,6 @@
         </div>
     </div>
 
-    <!-- Toast notification -->
     <div id="toast" class="fixed top-4 right-4 z-[70] hidden">
         <div class="bg-surface0 text-text px-4 py-2 rounded-lg shadow-lg border border-surface1">
             <span id="toast-message"></span>
@@ -260,9 +243,6 @@
     <script src="/static/js/marked.min.js"></script>
     <script src="/static/js/highlight.min.js"></script>
     <script>
-    // =========================================================================
-    // State
-    // =========================================================================
     const state = {
         canvas: { nodes: [], edges: [] },
         camera: { x: 0, y: 0, zoom: 1 },
@@ -284,18 +264,12 @@
         dirty: false,
     };
 
-    // =========================================================================
-    // DOM refs
-    // =========================================================================
     const viewport = document.getElementById('viewport');
     const transform = document.getElementById('canvas-transform');
     const edgesSvg = document.getElementById('canvas-edges');
     const laserSvg = document.getElementById('laser-svg');
     const laserPath = document.getElementById('laser-path');
 
-    // =========================================================================
-    // Marked + Highlight.js setup (v15 API)
-    // =========================================================================
     marked.use({
         breaks: true,
         renderer: {
@@ -315,9 +289,6 @@
         return marked.parse(md || '');
     }
 
-    // =========================================================================
-    // Camera / Transform
-    // =========================================================================
     function applyCameraTransform() {
         const { x, y, zoom } = state.camera;
         transform.style.transform = `translate(${x}px, ${y}px) scale(${zoom})`;
@@ -363,9 +334,6 @@
         applyCameraTransform();
     }
 
-    // =========================================================================
-    // Node rendering
-    // =========================================================================
     function getNodeById(id) {
         return state.canvas.nodes.find(n => n.id === id);
     }
@@ -389,7 +357,6 @@
             el.classList.add('canvas-group');
         }
 
-        // Content — the only child, clean and simple
         const content = document.createElement('div');
         content.className = 'node-content flex-1 overflow-y-auto p-3 text-sm text-text min-h-0';
         content.addEventListener('wheel', (e) => e.stopPropagation());
@@ -418,7 +385,6 @@
 
         el.appendChild(content);
 
-        // Resize handles
         ['n','ne','e','se','s','sw','w','nw'].forEach(dir => {
             const handle = document.createElement('div');
             handle.className = `resize-handle resize-${dir}`;
@@ -426,7 +392,6 @@
             el.appendChild(handle);
         });
 
-        // Anchor dots for edge creation
         ['top','bottom','left','right'].forEach(side => {
             const dot = document.createElement('div');
             dot.className = `anchor-dot anchor-${side}`;
@@ -464,9 +429,6 @@
         }
     }
 
-    // =========================================================================
-    // Inline editing (text nodes)
-    // =========================================================================
     function startEditingNode(nodeId, contentEl) {
         const node = getNodeById(nodeId);
         if (!node || node.type !== 'text') return;
@@ -491,9 +453,6 @@
         });
     }
 
-    // =========================================================================
-    // Edge rendering
-    // =========================================================================
     function renderAllEdges() {
         edgesSvg.querySelectorAll('path.edge-path, text.edge-label').forEach(el => el.remove());
         state.canvas.edges.forEach(edge => renderEdge(edge));
@@ -583,7 +542,6 @@
                 getAnchorPoint(fromNode, fromSide), fromSide,
                 getAnchorPoint(toNode, toSide), toSide
             ));
-            // Update label position too
             const labelEl = pathEl.nextElementSibling;
             if (labelEl && labelEl.classList.contains('edge-label')) {
                 const fromPt = getAnchorPoint(fromNode, fromSide);
@@ -594,10 +552,7 @@
         });
     }
 
-    // =========================================================================
-    // Edge drawing (from anchor dots)
-    // =========================================================================
-    const SNAP_MARGIN = 40; // px in canvas coords — proximity zone around each node
+    const SNAP_MARGIN = 40;
 
     function findNearestAnchor(canvasX, canvasY, excludeNodeId) {
         let best = null;
@@ -605,7 +560,6 @@
         const sides = ['top', 'bottom', 'left', 'right'];
         for (const node of state.canvas.nodes) {
             if (node.id === excludeNodeId) continue;
-            // Expand the node rect by SNAP_MARGIN to create a proximity zone
             const inZone = canvasX >= node.x - SNAP_MARGIN && canvasX <= node.x + node.width + SNAP_MARGIN &&
                            canvasY >= node.y - SNAP_MARGIN && canvasY <= node.y + node.height + SNAP_MARGIN;
             if (!inZone) continue;
@@ -643,15 +597,11 @@
         edgesSvg.appendChild(tempLine);
     }
 
-    // =========================================================================
-    // Panning — disabled when laser is active
-    // =========================================================================
     viewport.addEventListener('pointerdown', (e) => {
         if (state.laserActive) return;
         if (e.target.closest('.canvas-node') && !state.spaceHeld) return;
         if (e.target.closest('#toolbar') || e.target.closest('#file-modal')) return;
 
-        // Shift+drag on background: rubber band selection
         if (e.shiftKey && !state.spaceHeld) {
             state.selectionRect = {
                 startX: e.clientX,
@@ -669,7 +619,6 @@
             return;
         }
 
-        // Click on background without shift: clear selection
         state.selectedNodeIds.clear();
         document.querySelectorAll('.canvas-node.selected').forEach(el => el.classList.remove('selected'));
 
@@ -680,7 +629,6 @@
     });
 
     viewport.addEventListener('pointermove', (e) => {
-        // Rubber band selection
         if (state.selectionRect) {
             const sr = state.selectionRect;
             const rectEl = document.getElementById('selection-rect');
@@ -694,7 +642,6 @@
             rectEl.style.width = w + 'px';
             rectEl.style.height = h + 'px';
 
-            // Test intersection with all nodes
             const selRect = { left: x, top: y, right: x + w, bottom: y + h };
             state.selectedNodeIds.clear();
             document.querySelectorAll('.canvas-node').forEach(nodeEl => {
@@ -716,7 +663,6 @@
             const tempLine = document.getElementById('temp-edge-line');
             if (!tempLine) return;
 
-            // Remove previous snap highlight
             const prevHighlight = document.querySelector('.anchor-dot.snap-highlight');
             if (prevHighlight) prevHighlight.classList.remove('snap-highlight');
 
@@ -726,7 +672,6 @@
             if (snap) {
                 tempLine.setAttribute('x2', snap.x);
                 tempLine.setAttribute('y2', snap.y);
-                // Highlight the target anchor dot
                 const targetNode = document.querySelector(`[data-node-id="${snap.nodeId}"]`);
                 if (targetNode) {
                     const dot = targetNode.querySelector(`.anchor-${snap.side}`);
@@ -745,7 +690,6 @@
     });
 
     viewport.addEventListener('pointerup', (e) => {
-        // Rubber band selection end
         if (state.selectionRect) {
             const rectEl = document.getElementById('selection-rect');
             if (rectEl) rectEl.remove();
@@ -785,9 +729,6 @@
         }
     });
 
-    // =========================================================================
-    // Zoom (wheel + trackpad) — works even in laser mode
-    // =========================================================================
     viewport.addEventListener('wheel', (e) => {
         e.preventDefault();
         if (e.ctrlKey) {
@@ -800,9 +741,6 @@
         }
     }, { passive: false });
 
-    // =========================================================================
-    // Node drag & resize
-    // =========================================================================
     document.addEventListener('pointerdown', (e) => {
         if (state.laserActive) return;
         const nodeEl = e.target.closest('.canvas-node');
@@ -811,7 +749,6 @@
         const nodeId = nodeEl.dataset.nodeId;
 
         if (e.shiftKey) {
-            // Shift+click: toggle node in/out of selection
             if (state.selectedNodeIds.has(nodeId)) {
                 state.selectedNodeIds.delete(nodeId);
                 nodeEl.classList.remove('selected');
@@ -820,7 +757,6 @@
                 nodeEl.classList.add('selected');
             }
         } else {
-            // Click without shift: if node is already selected (multi-select), keep selection for drag
             if (!state.selectedNodeIds.has(nodeId)) {
                 document.querySelectorAll('.canvas-node.selected').forEach(el => el.classList.remove('selected'));
                 state.selectedNodeIds.clear();
@@ -832,7 +768,6 @@
         state.maxZIndex++;
         nodeEl.style.zIndex = state.maxZIndex;
 
-        // Resize handle
         if (e.target.classList.contains('resize-handle')) {
             e.stopPropagation();
             state.resizeState = {
@@ -850,13 +785,10 @@
             return;
         }
 
-        // Anchor dot
         if (e.target.classList.contains('anchor-dot')) return;
 
-        // Don't start drag from inside a textarea
         if (e.target.closest('textarea')) return;
 
-        // Node drag — store start positions for all selected nodes
         e.stopPropagation();
         const startPositions = {};
         for (const id of state.selectedNodeIds) {
@@ -878,7 +810,6 @@
         if (state.dragState) {
             const rawDx = e.clientX - state.dragState.startMouseX;
             const rawDy = e.clientY - state.dragState.startMouseY;
-            // Activate drag only after 3px movement threshold
             if (!state.dragState.activated) {
                 if (Math.abs(rawDx) < 3 && Math.abs(rawDy) < 3) return;
                 state.dragState.activated = true;
@@ -888,7 +819,6 @@
             const dx = rawDx / state.camera.zoom;
             const dy = rawDy / state.camera.zoom;
 
-            // Move all selected nodes
             for (const id of state.selectedNodeIds) {
                 const startPos = state.dragState.startPositions[id];
                 if (!startPos) continue;
@@ -920,7 +850,6 @@
             rs.nodeEl.style.top = nT + 'px';
             rs.nodeEl.style.width = nW + 'px';
             rs.nodeEl.style.height = nH + 'px';
-            // Update data model immediately so edges follow
             const node = getNodeById(rs.nodeId);
             if (node) { node.x = nL; node.y = nT; node.width = nW; node.height = nH; }
             updateEdgesForNode(rs.nodeId);
@@ -939,9 +868,6 @@
         }
     });
 
-    // =========================================================================
-    // Keyboard
-    // =========================================================================
     document.addEventListener('keydown', (e) => {
         if (e.target.closest('textarea, input')) return;
         if (e.key === ' ') {
@@ -978,9 +904,6 @@
         }
     });
 
-    // =========================================================================
-    // Laser pointer
-    // =========================================================================
     function toggleLaser() {
         state.laserActive = !state.laserActive;
         const btn = document.getElementById('btn-laser');
@@ -1001,14 +924,12 @@
         }
     }
 
-    // Laser events on the viewport directly
     viewport.addEventListener('pointerdown', (e) => {
         if (!state.laserActive) return;
         if (e.target.closest('#toolbar')) return;
         e.preventDefault();
         state.laserDrawing = true;
         state.laserStrokeStart = state.laserPoints.length;
-        // null marker separates strokes so they don't connect
         if (state.laserPoints.length > 0) state.laserPoints.push(null);
         state.laserPoints.push({ x: e.clientX, y: e.clientY, t: performance.now() });
         animateLaser();
@@ -1022,7 +943,6 @@
     viewport.addEventListener('pointerup', () => {
         if (state.laserActive && state.laserDrawing) {
             state.laserDrawing = false;
-            // Shift only the current stroke's timestamps so decay starts now
             const now = performance.now();
             const start = state.laserStrokeStart;
             let oldest = Infinity;
@@ -1041,22 +961,18 @@
     function animateLaser() {
         const now = performance.now();
         const DECAY = 1200;
-        // Remove fully decayed points (but never filter while actively drawing that stroke)
         const activeStart = state.laserDrawing ? state.laserStrokeStart : state.laserPoints.length;
         state.laserPoints = state.laserPoints.filter((p, i) => {
-            if (p === null) return true; // keep separators (cleaned below)
-            if (i >= activeStart) return true; // keep active stroke points
+            if (p === null) return true;
+            if (i >= activeStart) return true;
             return now - p.t < DECAY;
         });
-        // Clean up leading/consecutive/trailing null separators
         while (state.laserPoints.length > 0 && state.laserPoints[0] === null) state.laserPoints.shift();
         for (let i = state.laserPoints.length - 1; i > 0; i--) {
             if (state.laserPoints[i] === null && state.laserPoints[i-1] === null) state.laserPoints.splice(i, 1);
         }
         while (state.laserPoints.length > 0 && state.laserPoints[state.laserPoints.length - 1] === null) state.laserPoints.pop();
-        // Recalculate activeStart after filtering
         if (state.laserDrawing) {
-            // Find the last null separator — active stroke starts after it
             let lastNull = -1;
             for (let i = 0; i < state.laserPoints.length; i++) {
                 if (state.laserPoints[i] === null) lastNull = i;
@@ -1071,7 +987,6 @@
             return;
         }
 
-        // Build path with multiple strokes separated by nulls
         let d = '';
         for (let i = 0; i < state.laserPoints.length; i++) {
             const p = state.laserPoints[i];
@@ -1088,15 +1003,11 @@
         state.laserAnimId = requestAnimationFrame(animateLaser);
     }
 
-    // Laser button click handler
     document.getElementById('btn-laser').addEventListener('click', (e) => {
         e.stopPropagation();
         toggleLaser();
     });
 
-    // =========================================================================
-    // Toolbar actions
-    // =========================================================================
     function generateId() {
         return crypto.randomUUID().replace(/-/g, '').slice(0, 16);
     }
@@ -1212,9 +1123,6 @@
     });
     document.getElementById('btn-zoom-fit').addEventListener('click', zoomToFit);
 
-    // =========================================================================
-    // Delete node
-    // =========================================================================
     function deleteSelectedNodes() {
         if (state.selectedNodeIds.size === 0) return;
         for (const id of state.selectedNodeIds) {
@@ -1228,9 +1136,6 @@
         markDirty();
     }
 
-    // =========================================================================
-    // Double-click to create note
-    // =========================================================================
     viewport.addEventListener('dblclick', (e) => {
         if (state.laserActive) return;
         if (e.target.closest('.canvas-node') || e.target.closest('#toolbar')) return;
@@ -1251,9 +1156,6 @@
         startEditingNode(node.id, content);
     });
 
-    // =========================================================================
-    // Save / dirty state
-    // =========================================================================
     function markDirty() {
         state.dirty = true;
         scheduleSave();
@@ -1279,9 +1181,6 @@
         }
     }
 
-    // =========================================================================
-    // Toast
-    // =========================================================================
     function showToast(message, type) {
         const toast = document.getElementById('toast');
         const msg = document.getElementById('toast-message');
@@ -1292,9 +1191,6 @@
         setTimeout(() => toast.classList.add('hidden'), 3000);
     }
 
-    // =========================================================================
-    // Init
-    // =========================================================================
     async function init() {
         try {
             const resp = await fetch('/api/canvas');

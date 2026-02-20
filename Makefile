@@ -13,8 +13,8 @@ GOARCH ?= $(shell go env GOARCH)
 
 # Asset versions - update as needed
 TAILWIND_VERSION := latest
-LUCIDE_VERSION := 0.468.0
-MARKEDJS_VERSION := 15.0.6
+LUCIDE_VERSION := 0.574.0
+MARKEDJS_VERSION := 17.0.3
 HIGHLIGHTJS_VERSION := 11.11.1
 
 # Directories
@@ -64,7 +64,7 @@ verify-assets: ## Verify required assets exist
 
 clean: ## Remove built artifacts and downloaded assets
 	@rm -f $(APP_NAME) $(APP_NAME)-*
-	@rm -rf $(JS_DIR)/*.js $(CSS_DIR)/*.css $(FONTS_DIR)/*.woff2
+	@rm -rf $(JS_DIR)/*.js $(CSS_DIR)/*.css $(FONTS_DIR)/*.woff2 $(FONTS_DIR)/*.ttf
 	@echo "$(GREEN)Cleaned$(NC)"
 
 # =============================================================================
