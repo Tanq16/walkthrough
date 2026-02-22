@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Walkthrough</title>
-    <link rel="icon" type="image/png" href="/static/icons/favicon.png">
+    <link rel="icon" type="image/svg+xml" href="/static/icons/favicon.svg">
     <link rel="stylesheet" href="/static/css/inter.css">
     <link rel="stylesheet" href="/static/css/github-dark.min.css">
 
@@ -20,6 +20,7 @@
             --surface1: #45475a; --surface0: #313244; --base: #1e1e2e;
             --mantle: #181825; --crust: #11111b;
         }
+        html, body { overscroll-behavior: none; }
         body { font-family: 'Inter', sans-serif; margin: 0; overflow: hidden; }
 
         .canvas-node {
@@ -75,7 +76,7 @@
         }
         .node-content strong { color: var(--text); font-weight: 600; }
         .node-content em { color: var(--subtext1); }
-        .node-content img { max-width: 100%; border-radius: 4px; }
+        .node-content img { max-width: 100%; border-radius: 4px; -webkit-user-drag: none; user-drag: none; pointer-events: none; }
         .node-content table { border-collapse: collapse; width: 100%; margin: 0.4em 0; }
         .node-content th, .node-content td {
             border: 1px solid var(--surface1); padding: 0.25em 0.5em; text-align: left;
@@ -105,6 +106,16 @@
             overflow: hidden;
         }
 
+        .pdf-page-canvas {
+            display: block;
+            width: 100%;
+            height: auto;
+            margin-bottom: 4px;
+        }
+        .pdf-page-canvas:last-child {
+            margin-bottom: 0;
+        }
+
         .anchor-dot {
             position: absolute; width: 16px; height: 16px; border-radius: 50%;
             background: var(--blue); border: 2px solid var(--base);
@@ -132,6 +143,16 @@
             pointer-events: none !important;
         }
         body.laser-active .anchor-dot {
+            opacity: 0 !important;
+        }
+
+        body.move-active, body.move-active * {
+            cursor: grab !important;
+        }
+        body.move-active .canvas-node {
+            pointer-events: none !important;
+        }
+        body.move-active .anchor-dot {
             opacity: 0 !important;
         }
 
@@ -202,17 +223,21 @@
             <span>Attach</span>
         </button>
         <div class="w-px h-5 bg-surface1"></div>
+        <button id="btn-move" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-subtext1 hover:text-text hover:bg-surface1 transition-colors" title="Pan mode (Space)">
+            <i data-lucide="move" class="w-4 h-4"></i>
+            <span>Move</span>
+        </button>
         <button id="btn-laser" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-subtext1 hover:text-text hover:bg-surface1 transition-colors" title="Laser pointer (L)">
             <i data-lucide="pointer" class="w-4 h-4"></i>
             <span>Laser</span>
         </button>
         <div class="w-px h-5 bg-surface1"></div>
-        <button id="btn-zoom-in" class="p-1.5 rounded-lg text-subtext1 hover:text-text hover:bg-surface1 transition-colors" title="Zoom in">
-            <i data-lucide="zoom-in" class="w-4 h-4"></i>
-        </button>
-        <span id="zoom-level" class="text-xs text-overlay1 w-10 text-center select-none">100%</span>
         <button id="btn-zoom-out" class="p-1.5 rounded-lg text-subtext1 hover:text-text hover:bg-surface1 transition-colors" title="Zoom out">
             <i data-lucide="zoom-out" class="w-4 h-4"></i>
+        </button>
+        <span id="zoom-level" class="text-xs text-overlay1 w-10 text-center select-none">100%</span>
+        <button id="btn-zoom-in" class="p-1.5 rounded-lg text-subtext1 hover:text-text hover:bg-surface1 transition-colors" title="Zoom in">
+            <i data-lucide="zoom-in" class="w-4 h-4"></i>
         </button>
         <button id="btn-zoom-fit" class="p-1.5 rounded-lg text-subtext1 hover:text-text hover:bg-surface1 transition-colors" title="Zoom to fit">
             <i data-lucide="maximize-2" class="w-4 h-4"></i>
@@ -252,7 +277,7 @@
         resizeState: null,
         isPanning: false,
         panStart: { x: 0, y: 0 },
-        spaceHeld: false,
+        moveActive: false,
         laserActive: false,
         laserDrawing: false,
         laserPoints: [],
@@ -405,12 +430,71 @@
         return el;
     }
 
+    let pdfjsLib = null;
+
+    async function loadPdfjs() {
+        if (pdfjsLib) return pdfjsLib;
+        pdfjsLib = await import('/static/js/pdf.min.mjs');
+        pdfjsLib.GlobalWorkerOptions.workerSrc = '/static/js/pdf.worker.min.mjs';
+        return pdfjsLib;
+    }
+
+    async function renderPdfInNode(filePath, contentEl) {
+        try {
+            contentEl.innerHTML = '<p class="text-overlay1 text-xs italic">Loading PDF...</p>';
+            const pdfjs = await loadPdfjs();
+            const pdf = await pdfjs.getDocument('/api/files/' + filePath).promise;
+
+            contentEl.innerHTML = '';
+            const cs = getComputedStyle(contentEl);
+            const containerWidth = contentEl.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) || 280;
+
+            for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                const page = await pdf.getPage(pageNum);
+                const unscaledViewport = page.getViewport({ scale: 1 });
+                const scale = (containerWidth / unscaledViewport.width) * (window.devicePixelRatio || 1);
+                const viewport = page.getViewport({ scale });
+
+                const canvas = document.createElement('canvas');
+                canvas.className = 'pdf-page-canvas';
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+                canvas.style.width = containerWidth + 'px';
+                canvas.style.height = (containerWidth * (viewport.height / viewport.width)) + 'px';
+
+                contentEl.appendChild(canvas);
+
+                const ctx = canvas.getContext('2d');
+                await page.render({ canvasContext: ctx, viewport }).promise;
+            }
+        } catch (err) {
+            console.error('PDF render error:', err);
+            contentEl.innerHTML = '<p class="text-red text-xs">Error loading PDF</p>';
+        }
+    }
+
+    function reRenderPdfNodes(nodeId) {
+        const nodeData = getNodeById(nodeId);
+        if (!nodeData || nodeData.type !== 'file') return;
+        const ext = (nodeData.file || '').split('.').pop().toLowerCase();
+        if (ext !== 'pdf') return;
+        const el = document.querySelector(`[data-node-id="${nodeId}"]`);
+        if (!el) return;
+        const contentEl = el.querySelector('.node-content');
+        if (!contentEl) return;
+        renderPdfInNode(nodeData.file, contentEl);
+    }
+
     async function loadFileContent(filePath, contentEl) {
         try {
             const ext = filePath.split('.').pop().toLowerCase();
             const imgExts = ['png','jpg','jpeg','gif','svg','webp'];
             if (imgExts.includes(ext)) {
                 contentEl.innerHTML = `<img src="/api/files/${filePath}" alt="${filePath}" class="max-w-full rounded">`;
+                return;
+            }
+            if (ext === 'pdf') {
+                await renderPdfInNode(filePath, contentEl);
                 return;
             }
             const resp = await fetch('/api/files/' + filePath);
@@ -599,10 +683,10 @@
 
     viewport.addEventListener('pointerdown', (e) => {
         if (state.laserActive) return;
-        if (e.target.closest('.canvas-node') && !state.spaceHeld) return;
+        if (e.target.closest('.canvas-node') && !state.moveActive) return;
         if (e.target.closest('#toolbar') || e.target.closest('#file-modal')) return;
 
-        if (e.shiftKey && !state.spaceHeld) {
+        if (e.shiftKey && !state.moveActive) {
             state.selectionRect = {
                 startX: e.clientX,
                 startY: e.clientY,
@@ -742,7 +826,7 @@
     }, { passive: false });
 
     document.addEventListener('pointerdown', (e) => {
-        if (state.laserActive) return;
+        if (state.laserActive || state.moveActive) return;
         const nodeEl = e.target.closest('.canvas-node');
         if (!nodeEl) return;
 
@@ -863,8 +947,10 @@
             markDirty();
         }
         if (state.resizeState) {
+            const resizedNodeId = state.resizeState.nodeId;
             state.resizeState = null;
             markDirty();
+            reRenderPdfNodes(resizedNodeId);
         }
     });
 
@@ -872,16 +958,18 @@
         if (e.target.closest('textarea, input')) return;
         if (e.key === ' ') {
             e.preventDefault();
-            state.spaceHeld = true;
-            viewport.style.cursor = 'grab';
+            toggleMove();
         }
         if (e.key === 'l' || e.key === 'L') toggleLaser();
         if (e.key === 'Escape') {
+            if (state.moveActive) { toggleMove(); return; }
             if (state.laserActive) { toggleLaser(); return; }
             document.querySelectorAll('.canvas-node.selected').forEach(el => el.classList.remove('selected'));
             state.selectedNodeIds.clear();
         }
         if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedNodeIds.size > 0) deleteSelectedNodes();
+        if (e.key === 'x' || e.key === 'X') zoomAtPoint(window.innerWidth/2, window.innerHeight/2, state.camera.zoom * 1.2);
+        if (e.key === 'z' || e.key === 'Z') zoomAtPoint(window.innerWidth/2, window.innerHeight/2, state.camera.zoom / 1.2);
         if ((e.metaKey || e.ctrlKey) && (e.key === '=' || e.key === '+')) {
             e.preventDefault();
             zoomAtPoint(window.innerWidth/2, window.innerHeight/2, state.camera.zoom * 1.2);
@@ -897,14 +985,27 @@
         }
     });
 
-    document.addEventListener('keyup', (e) => {
-        if (e.key === ' ') {
-            state.spaceHeld = false;
-            viewport.style.cursor = '';
+    document.addEventListener('wheel', (e) => {
+        if (e.deltaX !== 0) e.preventDefault();
+    }, { passive: false });
+
+    function toggleMove() {
+        if (state.laserActive) toggleLaser();
+        state.moveActive = !state.moveActive;
+        const btn = document.getElementById('btn-move');
+        if (state.moveActive) {
+            btn.classList.remove('text-subtext1');
+            btn.classList.add('bg-surface1', 'text-blue');
+            document.body.classList.add('move-active');
+        } else {
+            btn.classList.remove('bg-surface1', 'text-blue');
+            btn.classList.add('text-subtext1');
+            document.body.classList.remove('move-active');
         }
-    });
+    }
 
     function toggleLaser() {
+        if (state.moveActive) toggleMove();
         state.laserActive = !state.laserActive;
         const btn = document.getElementById('btn-laser');
         if (state.laserActive) {
@@ -1002,6 +1103,11 @@
 
         state.laserAnimId = requestAnimationFrame(animateLaser);
     }
+
+    document.getElementById('btn-move').addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleMove();
+    });
 
     document.getElementById('btn-laser').addEventListener('click', (e) => {
         e.stopPropagation();
@@ -1137,7 +1243,7 @@
     }
 
     viewport.addEventListener('dblclick', (e) => {
-        if (state.laserActive) return;
+        if (state.laserActive || state.moveActive) return;
         if (e.target.closest('.canvas-node') || e.target.closest('#toolbar')) return;
         const pos = screenToCanvas(e.clientX, e.clientY);
         const node = {

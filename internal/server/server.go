@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/fs"
 	"log"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -15,8 +16,18 @@ import (
 	"github.com/google/uuid"
 )
 
+func init() {
+	mime.AddExtensionType(".mjs", "text/javascript")
+}
+
 //go:embed static
 var staticFiles embed.FS
+
+type Config struct {
+	Port    int
+	Host    string
+	DataDir string
+}
 
 type Server struct {
 	port    int
@@ -25,11 +36,11 @@ type Server struct {
 	mux     *http.ServeMux
 }
 
-func New(port int, host string, dataDir string) *Server {
+func New(cfg Config) *Server {
 	return &Server{
-		port:    port,
-		host:    host,
-		dataDir: dataDir,
+		port:    cfg.Port,
+		host:    cfg.Host,
+		dataDir: cfg.DataDir,
 		mux:     http.NewServeMux(),
 	}
 }

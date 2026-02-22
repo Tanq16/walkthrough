@@ -18,7 +18,11 @@ var serveCmd = &cobra.Command{
 	Use:   "serve",
 	Short: "Start the canvas viewer web server",
 	Run: func(cmd *cobra.Command, args []string) {
-		srv := server.New(serveFlags.port, serveFlags.host, serveFlags.data)
+		srv := server.New(server.Config{
+			Port: serveFlags.port,
+			Host: serveFlags.host,
+			DataDir: serveFlags.data,
+		})
 		if err := srv.Setup(); err != nil {
 			u.PrintFatal("Failed to setup server", err)
 		}

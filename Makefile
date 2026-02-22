@@ -16,6 +16,7 @@ TAILWIND_VERSION := latest
 LUCIDE_VERSION := 0.574.0
 MARKEDJS_VERSION := 17.0.3
 HIGHLIGHTJS_VERSION := 11.11.1
+PDFJS_VERSION := 5.4.624
 
 # Directories
 STATIC_DIR := internal/server/static
@@ -46,9 +47,11 @@ assets: ## Download static assets
 	@mkdir -p $(JS_DIR) $(CSS_DIR) $(FONTS_DIR)
 	@curl -sL "https://cdn.tailwindcss.com" -o "$(JS_DIR)/tailwindcss.js"
 	@curl -sL "https://unpkg.com/lucide@$(LUCIDE_VERSION)/dist/umd/lucide.min.js" -o "$(JS_DIR)/lucide.min.js"
-	@curl -sL "https://cdn.jsdelivr.net/npm/marked@$(MARKEDJS_VERSION)/marked.min.js" -o "$(JS_DIR)/marked.min.js"
+	@curl -sL "https://cdn.jsdelivr.net/npm/marked@$(MARKEDJS_VERSION)/lib/marked.umd.js" -o "$(JS_DIR)/marked.min.js"
 	@curl -sL "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/$(HIGHLIGHTJS_VERSION)/highlight.min.js" -o "$(JS_DIR)/highlight.min.js"
 	@curl -sL "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/$(HIGHLIGHTJS_VERSION)/styles/github-dark.min.css" -o "$(CSS_DIR)/github-dark.min.css"
+	@curl -sL "https://cdn.jsdelivr.net/npm/pdfjs-dist@$(PDFJS_VERSION)/build/pdf.min.mjs" -o "$(JS_DIR)/pdf.min.mjs"
+	@curl -sL "https://cdn.jsdelivr.net/npm/pdfjs-dist@$(PDFJS_VERSION)/build/pdf.worker.min.mjs" -o "$(JS_DIR)/pdf.worker.min.mjs"
 	@curl -sL "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" -H "User-Agent: Mozilla/5.0" -o "$(CSS_DIR)/inter.css"
 	@grep -o "https://fonts.gstatic.com/[^)']*" "$(CSS_DIR)/inter.css" | sort -u | while read url; do \
 		filename=$$(basename "$$url" | sed 's/?.*//'); \
@@ -64,13 +67,13 @@ verify-assets: ## Verify required assets exist
 
 clean: ## Remove built artifacts and downloaded assets
 	@rm -f $(APP_NAME) $(APP_NAME)-*
-	@rm -rf $(JS_DIR)/*.js $(CSS_DIR)/*.css $(FONTS_DIR)/*.woff2 $(FONTS_DIR)/*.ttf
+	@rm -rf $(JS_DIR)/*.js $(JS_DIR)/*.mjs $(CSS_DIR)/*.css $(FONTS_DIR)/*.woff2 $(FONTS_DIR)/*.ttf
 	@echo "$(GREEN)Cleaned$(NC)"
 
 # =============================================================================
 # Build
 # =============================================================================
-build: assets verify-assets ## Build binary for current platform
+build: verify-assets ## Build binary for current platform
 	@go build -ldflags="-s -w -X 'github.com/tanq16/walkthrough/cmd.AppVersion=$(VERSION)'" -o $(APP_NAME) .
 	@echo "$(GREEN)Built: ./$(APP_NAME)$(NC)"
 
@@ -78,7 +81,7 @@ build-for: verify-assets ## Build binary for specified GOOS/GOARCH
 	@CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) go build -ldflags="-s -w -X 'github.com/tanq16/walkthrough/cmd.AppVersion=$(VERSION)'" -o $(APP_NAME)-$(GOOS)-$(GOARCH) .
 	@echo "$(GREEN)Built: ./$(APP_NAME)-$(GOOS)-$(GOARCH)$(NC)"
 
-build-all: assets verify-assets ## Build all platform binaries
+build-all: verify-assets ## Build all platform binaries
 	@$(MAKE) build-for GOOS=linux GOARCH=amd64
 	@$(MAKE) build-for GOOS=linux GOARCH=arm64
 	@$(MAKE) build-for GOOS=darwin GOARCH=amd64
